@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeting Bingo 🎰</title>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --yellow: #FFE135;
+    --pink: #FF6B9D;
+    --teal: #4ECDC4;
+    --orange: #FF8C42;
+    --purple: #9B5DE5;
+    --dark: #0d0d18;
+    --surface: #16162a;
+    --border: rgba(255,255,255,0.07);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--dark);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* ── SETUP SCREEN ── */
+  #setupScreen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+      radial-gradient(ellipse at 15% 50%, rgba(255,225,53,0.12) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 30%, rgba(78,205,196,0.1) 0%, transparent 55%),
+      var(--dark);
+  }
+
+  .setup-box {
+    text-align: center;
+    max-width: 460px;
+    width: 100%;
+  }
+
+  .setup-title {
+    font-family: 'Permanent Marker', cursive;
+    font-size: clamp(3rem, 10vw, 5rem);
+    color: var(--yellow);
+    text-shadow: 0 0 60px rgba(255,225,53,0.3), 4px 4px 0 rgba(255,225,53,0.15);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .setup-sub {
+    color: rgba(255,255,255,0.35);
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .name-label {
+    display: block;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    text-align: left;
+  }
+
+  .name-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1.5px solid rgba(255,225,53,0.3);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: white;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 16px;
+  }
+
+  .name-input:focus {
+    border-color: var(--yellow);
+    box-shadow: 0 0 0 3px rgba(255,225,53,0.1);
+  }
+
+  .name-input::placeholder { color: rgba(255,255,255,0.2); }
+
+  .player-pills {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+
+  .player-pill {
+    padding: 8px 18px;
+    border-radius: 50px;
+    border: 1.5px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+
+  .player-pill:hover, .player-pill.active {
+    border-color: var(--yellow);
+    background: rgba(255,225,53,0.1);
+    color: var(--yellow);
+  }
+
+  .join-btn {
+    width: 100%;
+    background: var(--yellow);
+    color: #0d0d18;
+    border: none;
+    border-radius: 10px;
+    padding: 18px;
+    font-family: 'Permanent Marker', cursive;
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+
+  .join-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(255,225,53,0.35);
+  }
+
+  .join-btn:active { transform: translateY(0); }
+
+  /* ── GAME SCREEN ── */
+  #gameScreen { display: none; }
+
+  .game-header {
+    padding: 20px 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .game-title {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 1.6rem;
+    color: var(--yellow);
+    text-shadow: 0 0 20px rgba(255,225,53,0.3);
+  }
+
+  .online-players {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .online-dot {
+    width: 7px;
+    height: 7px;
+    background: #4ade80;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #4ade80;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .online-label {
+    color: rgba(255,255,255,0.4);
+    font-size: 0.78rem;
+    letter-spacing: 1px;
+  }
+
+  .leave-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.3);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .leave-btn:hover {
+    border-color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.6);
+  }
+
+  .boards-area {
+    padding: 30px 20px 60px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    justify-content: center;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+
+  /* ── BINGO CARD ── */
+  .card-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .player-badge {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 1.2rem;
+    padding: 7px 22px;
+    border-radius: 50px;
+    letter-spacing: 0.5px;
+  }
+
+  .bingo-card {
+    width: 330px;
+    background: var(--surface);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    transition: box-shadow 0.3s;
+  }
+
+  .bingo-card.is-mine {
+    box-shadow: 0 0 0 2px var(--yellow), 0 24px 64px rgba(0,0,0,0.5);
+  }
+
+  .bingo-header-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    text-align: center;
+  }
+
+  .bingo-letter {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 1.6rem;
+    padding: 13px 0;
+    color: #0d0d18;
+  }
+
+  .bingo-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .bingo-cell {
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 8px 5px;
+    text-align: center;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1.3;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.55);
+    position: relative;
+    letter-spacing: 0.3px;
+    transition: background 0.15s, color 0.15s, transform 0.1s;
+  }
+
+  .bingo-cell.is-mine {
+    cursor: pointer;
+  }
+
+  .bingo-cell.is-mine:hover:not(.marked) {
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.8);
+  }
+
+  .bingo-cell.is-mine:active {
+    transform: scale(0.95);
+  }
+
+  .bingo-cell.marked {
+    color: #0d0d18 !important;
+  }
+
+  .bingo-cell.free-space {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.2);
+  }
+
+  .win-strip {
+    display: none;
+    font-family: 'Permanent Marker', cursive;
+    font-size: 1rem;
+    text-align: center;
+    padding: 11px;
+    color: #0d0d18;
+    letter-spacing: 1px;
+    animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  .win-strip.show { display: block; }
+
+  @keyframes popIn {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .cell-ping {
+    animation: cellPop 0.3s ease;
+  }
+
+  @keyframes cellPop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+
+  /* Color themes per player index */
+  .theme-0 .player-badge { background: var(--yellow); color: #0d0d18; }
+  .theme-0 .bingo-letter { background: var(--yellow); }
+  .theme-0 .bingo-cell.marked { background: var(--yellow); }
+  .theme-0 .bingo-card.is-mine { box-shadow: 0 0 0 2px var(--yellow), 0 24px 64px rgba(0,0,0,0.5); }
+  .theme-0 .win-strip { background: var(--yellow); }
+
+  .theme-1 .player-badge { background: var(--pink); color: white; }
+  .theme-1 .bingo-letter { background: var(--pink); color: white; }
+  .theme-1 .bingo-cell.marked { background: var(--pink); color: white !important; }
+  .theme-1 .bingo-card.is-mine { box-shadow: 0 0 0 2px var(--pink), 0 24px 64px rgba(0,0,0,0.5); }
+  .theme-1 .win-strip { background: var(--pink); color: white; }
+
+  .theme-2 .player-badge { background: var(--teal); color: #0d0d18; }
+  .theme-2 .bingo-letter { background: var(--teal); }
+  .theme-2 .bingo-cell.marked { background: var(--teal); }
+  .theme-2 .bingo-card.is-mine { box-shadow: 0 0 0 2px var(--teal), 0 24px 64px rgba(0,0,0,0.5); }
+  .theme-2 .win-strip { background: var(--teal); }
+
+  .theme-3 .player-badge { background: var(--orange); color: #0d0d18; }
+  .theme-3 .bingo-letter { background: var(--orange); }
+  .theme-3 .bingo-cell.marked { background: var(--orange); }
+  .theme-3 .bingo-card.is-mine { box-shadow: 0 0 0 2px var(--orange), 0 24px 64px rgba(0,0,0,0.5); }
+  .theme-3 .win-strip { background: var(--orange); }
+
+  .theme-4 .player-badge { background: var(--purple); color: white; }
+  .theme-4 .bingo-letter { background: var(--purple); color: white; }
+  .theme-4 .bingo-cell.marked { background: var(--purple); color: white !important; }
+  .theme-4 .bingo-card.is-mine { box-shadow: 0 0 0 2px var(--purple), 0 24px 64px rgba(0,0,0,0.5); }
+  .theme-4 .win-strip { background: var(--purple); color: white; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 999;
+    white-space: nowrap;
+  }
+
+  #toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── CONFIG NOTICE ── */
+  #configNotice {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: #ff4444;
+    color: white;
+    text-align: center;
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    z-index: 9999;
+    letter-spacing: 0.5px;
+  }
+
+  #configNotice a { color: white; }
+
+  .waiting-msg {
+    color: rgba(255,255,255,0.2);
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 60px 20px;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<!-- ██████████  CONFIGURE THIS BEFORE SHARING  ██████████ -->
+<!-- 
+  1. Create a FREE Supabase project at https://supabase.com
+  2. In the SQL editor, run this:
+  
+     create table bingo_state (
+       id text primary key,
+       player text not null,
+       squares jsonb not null,
+       marked jsonb not null,
+       updated_at timestamptz default now()
+     );
+     alter table bingo_state enable row level security;
+     create policy "Public read" on bingo_state for select using (true);
+     create policy "Public write" on bingo_state for insert with check (true);
+     create policy "Public update" on bingo_state for update using (true);
+  
+  3. Replace the two values below with your project URL and anon key
+-->
+<script>
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+</script>
+<!-- ███████████████████████████████████████████████████ -->
+
+<div id="configNotice" style="display:none">
+  ⚠️ Supabase not configured yet. <a href="#" onclick="document.getElementById('configNotice').style.display='none'">Dismiss (local-only mode)</a>
+</div>
+
+<div id="toast"></div>
+
+<!-- SETUP -->
+<div id="setupScreen">
+  <div class="setup-box">
+    <div class="setup-title">BINGO</div>
+    <div class="setup-sub">Meeting Survival Game</div>
+
+    <label class="name-label">Your name</label>
+    <input class="name-input" id="nameInput" type="text" placeholder="Enter your name..." maxlength="20" />
+
+    <div class="player-pills" id="quickPicks">
+      <button class="player-pill" onclick="pickName('Travis')">Travis</button>
+      <button class="player-pill" onclick="pickName('Paige')">Paige</button>
+      <button class="player-pill" onclick="pickName('MaryClare')">MaryClare</button>
+    </div>
+
+    <button class="join-btn" onclick="joinGame()">LET'S PLAY 🎰</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="gameScreen">
+  <div class="game-header">
+    <div class="game-title">MEETING BINGO 🎰</div>
+    <div class="online-players">
+      <div class="online-dot"></div>
+      <div class="online-label" id="onlineCount">1 playing</div>
+    </div>
+    <button class="leave-btn" onclick="leaveGame()">Leave</button>
+  </div>
+  <div class="boards-area" id="boardsArea">
+    <div class="waiting-msg" id="waitingMsg">Waiting for other players to join...</div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG CHECK ──
+if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+  document.getElementById('configNotice').style.display = 'block';
+}
+
+// ── SUPABASE INIT ──
+let sbClient = null;
+try {
+  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch(e) {}
+
+// ── BINGO SQUARES ──
+const ALL_SQUARES = [
+  "Yelp",
+  "Walking around doing nothing",
+  "Humberto",
+  "Build itself",
+  "NEO",
+  "I did more local yesterday...",
+  "Instant BINGO if she doesn't join!!",
+  "Caleb starts talking thinking he's on mute",
+  "People asking what I should be doing",
+  "Someone asks to be muted",
+  "Someone says something about Bob or Deanna",
+  "Blog post topics",
+  "Technical difficulties",
+  "Can everyone hear me?",
+  "Sorry I was on mute",
+  "Let's take this offline",
+  "Quick question",
+  "Moving forward",
+  "Circle back",
+  "Just to piggyback on that",
+  "Can you share your screen?",
+  "Low battery warning",
+  "Background noise",
+  "Sorry I joined late",
+];
+
+const COLORS = ['#FFE135','#FF6B9D','#4ECDC4','#FF8C42','#9B5DE5'];
+
+// ── STATE ──
+let myName = '';
+let myId = '';
+let mySquares = [];
+let myMarked = [];
+let allPlayers = {};
+let subscription = null;
+let playerOrder = [];
+
+// ── UTILS ──
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function checkWin(marked) {
+  for (let r = 0; r < 5; r++) {
+    if ([0,1,2,3,4].every(c => marked[r*5+c])) return true;
+  }
+  for (let c = 0; c < 5; c++) {
+    if ([0,1,2,3,4].every(r => marked[r*5+c])) return true;
+  }
+  if ([0,6,12,18,24].every(i => marked[i])) return true;
+  if ([4,8,12,16,20].every(i => marked[i])) return true;
+  return false;
+}
+
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function playerThemeIndex(playerId) {
+  if (!playerOrder.includes(playerId)) playerOrder.push(playerId);
+  return playerOrder.indexOf(playerId) % 5;
+}
+
+// ── SETUP ──
+window.pickName = pickName;
+window.joinGame = joinGame;
+window.leaveGame = leaveGame;
+
+function pickName(name) {
+  document.getElementById('nameInput').value = name;
+  document.querySelectorAll('.player-pill').forEach(p => {
+    p.classList.toggle('active', p.textContent === name);
+  });
+}
+
+document.getElementById('nameInput').addEventListener('input', function() {
+  document.querySelectorAll('.player-pill').forEach(p => p.classList.remove('active'));
+});
+
+document.getElementById('nameInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') joinGame();
+});
+
+function joinGame() {
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { showToast('Enter your name first!'); return; }
+
+  myName = name;
+  myId = name.toLowerCase().replace(/\s+/g, '_') + '_' + Math.random().toString(36).slice(2, 6);
+
+  const shuffled = shuffle(ALL_SQUARES).slice(0, 24);
+  shuffled.splice(12, 0, 'FREE SPACE');
+  mySquares = shuffled;
+  myMarked = new Array(25).fill(false);
+  myMarked[12] = true;
+
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('gameScreen').style.display = 'block';
+
+  startGame();
+}
+
+// ── GAME ──
+async function startGame() {
+  if (!sbClient || SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+    // Local-only mode
+    allPlayers[myId] = { id: myId, player: myName, squares: mySquares, marked: myMarked };
+    renderBoards();
+    return;
+  }
+
+  // Push my board to Supabase
+  await sbClient.from('bingo_state').upsert({
+    id: myId,
+    player: myName,
+    squares: mySquares,
+    marked: myMarked,
+    updated_at: new Date().toISOString()
+  });
+
+  // Load existing players
+  const { data } = await sbClient.from('bingo_state').select('*');
+  if (data) {
+    data.forEach(row => {
+      allPlayers[row.id] = row;
+    });
+  }
+
+  renderBoards();
+
+  // Subscribe to realtime changes
+  subscription = sbClient
+    .channel('bingo_room')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_state' }, payload => {
+      const row = payload.new;
+      if (!row || !row.id) return;
+      const isNew = !allPlayers[row.id];
+      allPlayers[row.id] = row;
+      if (isNew && row.id !== myId) {
+        showToast(`${row.player} joined the game!`);
+      }
+      renderBoards();
+    })
+    .subscribe();
+}
+
+function renderBoards() {
+  const area = document.getElementById('boardsArea');
+  const players = Object.values(allPlayers);
+
+  // Sort: me first, then others by name
+  players.sort((a, b) => {
+    if (a.id === myId) return -1;
+    if (b.id === myId) return 1;
+    return a.player.localeCompare(b.player);
+  });
+
+  // Update online count
+  document.getElementById('onlineCount').textContent =
+    players.length === 1 ? '1 playing' : `${players.length} playing`;
+
+  document.getElementById('waitingMsg').style.display = players.length <= 1 ? 'block' : 'none';
+
+  // Remove cards no longer present
+  area.querySelectorAll('.card-wrap[data-pid]').forEach(el => {
+    if (!allPlayers[el.dataset.pid]) el.remove();
+  });
+
+  players.forEach(p => {
+    const themeIdx = playerThemeIndex(p.id);
+    const isMine = p.id === myId;
+    const existingWrap = area.querySelector(`.card-wrap[data-pid="${p.id}"]`);
+
+    if (existingWrap) {
+      // Just update cells
+      updateCardCells(existingWrap, p, isMine);
+      return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = `card-wrap theme-${themeIdx}`;
+    wrap.dataset.pid = p.id;
+
+    const badge = document.createElement('div');
+    badge.className = 'player-badge';
+    badge.textContent = isMine ? `${p.player} (you)` : p.player;
+
+    const card = document.createElement('div');
+    card.className = 'bingo-card' + (isMine ? ' is-mine' : '');
+
+    // Header
+    const headerRow = document.createElement('div');
+    headerRow.className = 'bingo-header-row';
+    ['B','I','N','G','O'].forEach(l => {
+      const el = document.createElement('div');
+      el.className = 'bingo-letter';
+      el.textContent = l;
+      headerRow.appendChild(el);
+    });
+
+    // Grid
+    const grid = document.createElement('div');
+    grid.className = 'bingo-grid';
+    grid.dataset.pid = p.id;
+
+    p.squares.forEach((text, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'bingo-cell' + (i === 12 ? ' free-space' : '') + (p.marked[i] ? ' marked' : '') + (isMine ? ' is-mine' : '');
+      cell.dataset.index = i;
+      cell.textContent = text;
+
+      if (isMine && i !== 12) {
+        cell.addEventListener('click', () => toggleCell(i, cell));
+      }
+
+      grid.appendChild(cell);
+    });
+
+    // Win banner
+    const winStrip = document.createElement('div');
+    winStrip.className = 'win-strip' + (checkWin(p.marked) ? ' show' : '');
+    winStrip.textContent = `🎉 BINGO! ${p.player} wins!`;
+
+    card.appendChild(headerRow);
+    card.appendChild(grid);
+    card.appendChild(winStrip);
+
+    wrap.appendChild(badge);
+    wrap.appendChild(card);
+    area.appendChild(wrap);
+  });
+}
+
+function updateCardCells(wrap, p, isMine) {
+  const grid = wrap.querySelector('.bingo-grid');
+  if (!grid) return;
+  const cells = grid.querySelectorAll('.bingo-cell');
+  cells.forEach((cell, i) => {
+    cell.classList.toggle('marked', !!p.marked[i]);
+  });
+  const winStrip = wrap.querySelector('.win-strip');
+  if (winStrip) {
+    const won = checkWin(p.marked);
+    winStrip.classList.toggle('show', won);
+    winStrip.textContent = `🎉 BINGO! ${p.player} wins!`;
+  }
+}
+
+async function toggleCell(index, cellEl) {
+  myMarked[index] = !myMarked[index];
+  cellEl.classList.toggle('marked', myMarked[index]);
+  cellEl.classList.add('cell-ping');
+  setTimeout(() => cellEl.classList.remove('cell-ping'), 300);
+
+  const won = checkWin(myMarked);
+
+  // Update local state
+  allPlayers[myId] = { ...allPlayers[myId], marked: [...myMarked] };
+
+  // Update win banner immediately
+  const myWrap = document.querySelector(`.card-wrap[data-pid="${myId}"]`);
+  if (myWrap) {
+    const winStrip = myWrap.querySelector('.win-strip');
+    if (winStrip) {
+      winStrip.classList.toggle('show', won);
+      if (won) showToast('🎉 BINGO! You win!', 4000);
+    }
+  }
+
+  // Push to Supabase
+  if (sbClient if (supabase && if (supabase &&  SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+    await sbClient.from('bingo_state').update({
+      marked: myMarked,
+      updated_at: new Date().toISOString()
+    }).eq('id', myId);
+  }
+}
+
+async function leaveGame() {
+  if (sbClient if (supabase && if (supabase &&  SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+    await sbClient.from('bingo_state').delete().eq('id', myId);
+    if (subscription) sbClient.removeChannel(subscription);
+  }
+  allPlayers = {};
+  playerOrder = [];
+  myName = '';
+  myId = '';
+  document.getElementById('boardsArea').innerHTML = '<div class="waiting-msg" id="waitingMsg">Waiting for other players to join...</div>';
+  document.getElementById('gameScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'flex';
+}
+</script>
+</body>
+</html>
